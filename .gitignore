@@ -1,0 +1,11 @@
+.DS_Store   # developing on a mac :/
+
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+.venv/
+venv/
+env/
+coct-challenge  # specific venv

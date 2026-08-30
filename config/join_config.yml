@@ -1,0 +1,26 @@
+# task 2: service-request to H3 res-8 join config
+
+columns:
+  # source coordinate fields.
+  latitude: "latitude"
+  longitude: "longitude"
+
+  # generated H3 index field.
+  output_index: "h3_level8_index"
+
+  # used to confirm row alignment with the supplied ref dataset.
+  validation_key_columns:
+    - "notification_number"
+    - "reference_number"
+
+h3:
+  resolution: 8
+  null_geolocation_index: "0"
+
+# Maximum permitted failure rate among rows that contain coordinates.
+# Rows with missing coordinates are assigned "0" and excluded from this rate.
+#
+# The 2% threshold tolerates occasional invalid or out-of-coverage coordinates
+# while still detecting systemic problems such as reversed coordinate fields,
+# incorrect units, or an inappropriate H3 resolution.
+join_error_threshold: 0.02

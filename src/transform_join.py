@@ -15,8 +15,8 @@ import io
 import gzip
 import h3, yaml, json
 import pandas as pd
-from src.utils import timed
 from dataclasses import dataclass
+from src.utils import timed, load_yaml
 from src.settings import Settings, get_s3_client, logger
 
 
@@ -58,9 +58,9 @@ class JoinReport:
         return "\n".join(lines)
     
 
-def load_join_config(path: str = "config/join_config.yml") -> dict:
-    with open(path) as f:
-        return yaml.safe_load(f)
+# def load_join_config(path: str = "config/join_config.yml") -> dict:
+#     with open(path) as f:
+#         return yaml.safe_load(f)
     
 def load_valid_hex_set(bucket: str = Settings.S3_BUCKET, key: str = Settings.HEX_RES8_KEY) -> set[str]:
     '''
@@ -86,7 +86,7 @@ def join_service_requests_to_hex(sr_df: pd.DataFrame, config: dict | None = None
         main join logic
     '''
 
-    config = config or load_join_config()
+    config = config or load_yaml("config/join_config.yml")
     cols = config["columns"]
 
     lat_col, lon_col, out_col = cols['latitude'], cols['longitude'], cols['output_index']

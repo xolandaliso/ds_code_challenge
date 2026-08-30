@@ -31,9 +31,9 @@ class Settings:
     OUTPUT_DIR: str = os.getenv("OUTPUT_DIR", "outputs")
     LOG_DIR: str = os.getenv("LOG_DIR", "logs")
 
-# i just love the color in prety_loguru - feel free to change the logger to your preferred logging library
+# using loguru instead of the standard
 logger = create_logger(
-    name="cct_de_challenge",
+    name="ds_code_challenge",
     log_path=Settings.LOG_DIR,
     level=os.getenv("LOG_LEVEL", "INFO"),
 )

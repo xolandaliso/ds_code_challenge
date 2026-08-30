@@ -89,5 +89,5 @@ def extract_hex_resolution8(
 
 if __name__ == "__main__":
     features = extract_hex_resolution8()
-    print(f"extracted {len(features)} res-8 features.")
+    logger.info(f"extracted {len(features)} res-8 features.")
 

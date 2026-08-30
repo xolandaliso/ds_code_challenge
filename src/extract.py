@@ -7,9 +7,9 @@ task 1 — data extraction.
     - validate (implemented in validate_extraction.py) against city-hex-polygons-8.geojson (this only has res 8 data)
 '''
 
-import time
 import json
 from typing import Any
+from src.utils import timed
 from src.settings import Settings, get_s3_client, logger
 
 def extract_resolution8_via_s3_select(

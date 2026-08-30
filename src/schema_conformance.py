@@ -171,7 +171,10 @@ def score_features(features: list[dict[str, Any]], schema: dict[str, Any]) -> Co
         fail_count=fail_count,
         violations=violations,
     )
-    logger.info("Conformance check complete: %.4f mean score over %d records", mean_score, total)
+    logger.info(
+        f"Conformance check complete: {mean_score:.4f} "
+        f"mean score over {total} records"
+    )
     return result
 
 

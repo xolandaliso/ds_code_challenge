@@ -1,0 +1,38 @@
+# schema definition for the H3 resolution-8 hex polygon dataset.
+
+
+dataset_name: city-hex-polygons-8
+
+feature_properties:
+  index:
+    type: string
+    nullable: false
+    description: "H3 cell index for this polygon"
+    pattern: "^[0-9a-fA-F]{15}$"        # normally 15 hex chars - 
+  resolution:
+    type: integer
+    nullable: false
+    allowed_values: [8]
+  centroid_lat:
+    type: float
+    nullable: false
+    min: -35.0    # rough CT metro bounding box
+    max: -33.0
+  centroid_lon:
+    type: float
+    nullable: false
+    min: 17.5
+    max: 19.5
+
+geometry:
+  type:
+    allowed_values: ["Polygon"]   # confirmed - via inspect_schema.py
+  coordinates:
+    nullable: false
+    min_points: 3        # a polygon ring needs at least 3 distinct points
+
+# score thresholds — used only for human-readable reporting
+score_bands:
+  pass: 0.98
+  warn: 0.90
+  fail: 0.0

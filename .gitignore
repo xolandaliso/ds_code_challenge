@@ -1,15 +1,20 @@
-.DS_Store   # developing on a mac :/
+# developing on a mac :/
+.DS_Store   
 
 __pycache__/
 *.pyc
 *.pyo
 *.pyd
 
+# venv
 .venv/
 venv/
 env/
-coct-challenge  # specific venv
+coct-challenge  
 
-src/inspect_*.py  # scripts for inspecting schema, not part of the main code
-logs/*             # not pushing the logs - generate at runtime
-outputs/*          # perhaps do not push this too - will decide later
+# scripts for inspecting schema, not part of the main code
+/src/inspect_*.py  
+
+# not pushing the logs/outputs
+logs/*             
+outputs/*          

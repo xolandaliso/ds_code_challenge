@@ -15,3 +15,13 @@ suburb:
   projected_crs: EPSG:32734
   radius_metres: 1852.0   # ~ 1 arcmin
 
+wind:
+  urls:
+    - "https://www.arcgis.com/sharing/rest/content/items/31ef242a23484e79bbb19d6b29203179/data"
+  cache_path: data/Wind_direction_and_speed_2020.xlsx
+  station_name: Atlantis
+  match_tolerance_minutes: 90
+  max_unmatched_rate: 0.65   # station only covers ~28% of 2020's days; see debug warning on logs
+
+anonymisation:
+  time_bucket_hours: 6

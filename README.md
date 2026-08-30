@@ -1,5 +1,268 @@
-
 <img src="img/city_emblem.png" alt="City Logo"/>
+
+# COCT Attempt of the Data Engineer Challenge
+
+A reproducible Python solution for Data Engineering Tasks 1, 2, and 5.
+
+## 1. AWS Credentials
+
+Task 1 uses S3 Select, which does not permit anonymous requests. Set this up
+**before** installing dependencies or running the pipeline — both the venv
+and Docker paths below depend on `.env` already existing.
+
+Download the temporary credentials supplied with the challenge:
+
+[Challenge AWS credentials](https://cct-ds-code-challenge-input-data.s3.af-south-1.amazonaws.com/ds_code_challenge_creds.json)
+
+Create the local environment file:
+
+```bash
+cp .env.example .env
+```
+
+Add the supplied values to `.env`:
+
+```env
+AWS_ACCESS_KEY_ID=
+AWS_SECRET_ACCESS_KEY=
+```
+
+The `.env` file contains credentials and must not be committed.
+
+## 2. Installation and Run
+
+Python 3.11 or later is required.
+
+```bash
+python -m venv .venv
+source .venv/bin/activate
+pip install -r requirements.txt
+python -m src.main
+```
+
+The pipeline runs without interactive input once dependencies and
+credentials have been configured.
+
+If you prefer Docker, build and run **after** `.env` has been created — the
+`--env-file` flag loads the credentials into the container, and the image's
+entrypoint runs the pipeline directly, so no separate `python -m src.main`
+step is needed:
+
+```bash
+docker build -t cct-de-challenge .
+docker run --rm \
+  --env-file .env \
+  -v "$(pwd)/outputs:/app/outputs" \
+  -v "$(pwd)/logs:/app/logs" \
+  -v "$(pwd)/data:/app/data" \
+  cct-de-challenge
+```
+
+## 3. Run the Tests
+
+```bash
+python -m pytest -v
+```
+
+The tests run offline using synthetic inputs and mocked network dependencies.
+They cover:
+
+* S3 Select response parsing and failure handling
+* schema-conformance scoring
+* Task 1 reference validation
+* H3 resolution and missing-coordinate handling
+* join thresholds and reference validation
+* official-suburb centroid calculation
+* metric-radius filtering
+* wind-workbook normalisation and caching
+* temporal wind matching
+* H3 and timestamp anonymisation controls
+
+The current suite contains 37 passing tests.
+
+## Outputs
+
+| Task              | Output                                                        |
+| ----------------- | -------------------------------------------------------------- |
+| Task 1            | `outputs/task1_extracted_features.json`                        |
+| Task 2            | `outputs/sr_hex_joined.csv`                                    |
+| Task 5.1          | `outputs/task5_1_subsample.csv`                                 |
+| Task 5.2          | `outputs/task5_2_augmented.csv`                                 |
+| Task 5.3          | `outputs/task5_3_anonymised.csv`                                |
+| Controlled review | `outputs/restricted_manual_review/task5_3_manual_review.csv`   |
+| Logs              | `logs/ds_code_challenge_*.log`                                  |
+
+The controlled-review file contains direct identifiers. It must not be
+published or committed.
+
+## Design
+
+### Task 1 — Extraction and Validation
+
+`src/extract.py` uses S3 Select to retrieve resolution-8 features directly
+from `city-hex-polygons-8-10.geojson` without downloading the complete
+mixed-resolution file. Extraction fails explicitly if S3 Select fails or
+returns no records.
+
+The extracted indexes are compared with the supplied `city-hex-polygons-8.geojson`
+reference dataset. A separate, non-binary schema-conformance score validates
+feature properties and polygon geometry against the rules in
+`config/hex_schema.yml`.
+
+Extraction, schema validation, and reference validation are timed and logged
+separately.
+
+### Task 2 — Request-to-H3 Transformation
+
+`src/transform_join.py` converts valid service-request coordinates to H3
+resolution-8 indexes:
+
+* rows with missing latitude or longitude receive the index `"0"`
+* invalid, non-null coordinates receive `"join_failed"`
+* valid H3 indexes outside the supplied City polygon coverage are retained
+  but counted as coverage failures
+* the failure rate excludes rows with missing coordinates
+* the pipeline stops if the configured 2% failure threshold is exceeded
+
+The threshold and its rationale are documented in `config/join_config.yml`.
+
+`src/validate_join.py` performs a row-level comparison with the supplied
+`sr_hex.csv.gz` reference dataset — verifying row count, row alignment using
+the configured identifier columns, and the generated H3 value. The pipeline
+requires an exact reference match.
+
+### Task 5.1 — Suburb-Centroid Subsample
+
+The City's Official Suburb layer does not contain a polygon named
+`Atlantis`. `ROBINVALE` was selected as an official suburb in the Atlantis
+area.
+
+`src/subsample_atlantis.py` programmatically downloads the City of Cape
+Town Official Suburb polygon layer, selects Robinvale by name, and
+calculates its centroid. The geometry is projected from WGS 84
+(`EPSG:4326`) to WGS 84 / UTM zone 34S (`EPSG:32734`) before calculating the
+centroid and distances in metres.
+
+The phrase "within 1 minute" in the challenge is interpreted as a radial
+separation of one minute of arc:
+
+$$
+1\text{ arc-minute}\approx1.852\text{ km}.
+$$
+
+Requests within 1,852 metres of the calculated centroid are retained. The
+centroid is never hard-coded. A successful official-layer download is
+cached so the pipeline can recover from temporary service failures.
+
+Official suburb source:
+[City of Cape Town Official Suburb layer](https://citymaps.capetown.gov.za/agsext/rest/services/Theme_Based/Political_Administrative_Boundaries/MapServer/4)
+
+### Task 5.2 — Wind Enrichment
+
+The original ODS link supplied in the challenge is no longer available. The
+pipeline therefore downloads the current official City of Cape Town Wind
+2020 Excel workbook from ArcGIS:
+
+[City of Cape Town Wind 2020](https://www.arcgis.com/home/item.html?id=31ef242a23484e79bbb19d6b29203179)
+
+`src/augment_wind.py`:
+
+* retries temporary HTTP failures using exponential backoff and jitter
+* verifies that the response is a valid ZIP-based spreadsheet
+* caches the most recent successful download
+* detects whether the workbook is ODS or XLSX from its internal structure
+* identifies the Atlantis AQM wind-direction and wind-speed columns
+* joins each request to the nearest wind observation within 90 minutes
+* preserves the original request order
+* records the temporal offset between the request and wind observation
+* stops if the configured maximum unmatched rate is exceeded
+
+The Atlantis series contains 2,324 observations covering 101 distinct days
+in 2020. In the latest pipeline run, 4,288 of 10,576 requests were matched
+and 6,288 remained unmatched, giving an unmatched rate of 59.46%. Unmatched
+requests retain null wind values rather than receiving imputed
+measurements. The configured 65% maximum reflects this documented
+limitation of the supplied source.
+
+### Task 5.3 — Anonymisation
+
+`src/anonymize.py` creates a publication dataset with reduced spatial and
+temporal precision.
+
+Raw latitude and longitude are removed. Location is retained only as an H3
+resolution-8 index, representing an approximate spatial precision of 500
+metres. Creation, completion, and wind timestamps are floored to fixed
+six-hour intervals.
+
+`notification_number` and `reference_number` are removed from the
+publication dataset and placed in a separately controlled manual-review
+table. A randomly generated surrogate identifier links a publication row to
+its controlled-review record without exposing the original identifiers.
+
+The supplied service-request dataset contains no resident name, address,
+contact number, or free-text description. The notification and reference
+numbers are therefore the principal remaining direct identifiers. The
+controlled-review file must be handled separately and must not be
+published.
+
+These measures reduce the precision of location and time, remove direct
+identifiers, and preserve only the fields required for analysis. However,
+anonymisation is treated as a risk-reduction process rather than a
+guarantee. Records in the controlled-review table require manual assessment
+before any release.
+
+## Configuration
+
+Reviewable schemas, field mappings, thresholds, and Task 5 parameters are
+stored in:
+
+```text
+config/hex_schema.yml
+config/join_config.yml
+config/task5.yml
+```
+
+This keeps data-quality expectations and operational thresholds separate
+from the implementation.
+
+## Repository Structure
+
+```text
+config/                     Schemas, mappings and thresholds
+src/main.py                 Non-interactive pipeline entrypoint
+src/utils.py                Shared timing, YAML and S3 helpers
+src/extract.py              Task 1 S3 Select extraction
+src/validate_extraction.py  Task 1 reference validation
+src/schema_conformance.py   Task 1 conformance scoring
+src/transform_join.py       Task 2 H3 assignment
+src/validate_join.py        Task 2 reference validation
+src/subsample_atlantis.py   Task 5.1 centroid and spatial filter
+src/augment_wind.py         Task 5.2 wind download and enrichment
+src/anonymize.py            Task 5.3 privacy transformation
+tests/                      Offline test suite
+AI_log.md                   Record of AI-assisted work
+```
+
+## Generated and Sensitive Files
+
+The following must not be committed:
+
+* `.env`
+* downloaded source-data caches
+* pipeline outputs
+* log files
+* the controlled manual-review dataset
+* Python virtual environments
+* Python cache files
+
+# i keep the original below this
+
+-------
+
+## Original challenge brief
+
+The original City of Cape Town challenge description may be retained below this section for reference.
+
 
 # City of Cape Town - Data Science Unit Code Challenge
 

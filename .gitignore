@@ -23,3 +23,4 @@ coct-challenge
 # not pushing the logs/outputs
 logs/*             
 outputs/*          
+data/*

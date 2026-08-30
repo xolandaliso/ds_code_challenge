@@ -10,6 +10,6 @@ venv/
 env/
 coct-challenge  # specific venv
 
-inspect_schema.py  # script for inspecting schema, not part of the main code
+src/inspect_schema.py  # script for inspecting schema, not part of the main code
 logs/*             # not pushing the logs - generate at runtime
 outputs/*          # perhaps do not push this too - will decide later

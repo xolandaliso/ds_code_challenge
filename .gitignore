@@ -12,6 +12,11 @@ venv/
 env/
 coct-challenge  
 
+# dark secrets
+.env
+.env.*
+!.env.example
+
 # scripts for inspecting schema, not part of the main code
 /src/inspect_*.py  
 

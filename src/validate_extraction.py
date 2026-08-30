@@ -1,10 +1,10 @@
 '''
     task 1 validation — data extraction.
 
-    - validate the extracted resolution-8 records
+    - validate the extracted res-8 records
       against the reference city-hex-polygons-8.geojson (this only has res 8 data)
 
-    - this does apples-to-apples comparison, schema conformance is written separately.
+    - this does apples-to-apples comparison.
 '''
 
 import time
@@ -85,4 +85,4 @@ if __name__ == "__main__":
     # validate extraction
     validation_result = validate_extraction(extracted_features, reference_indices)
 
-    logger.info(f"validation result \n: {validation_result.summary()}")
+    #logger.info(f"validation result \n: {validation_result.summary()}") -- redundant

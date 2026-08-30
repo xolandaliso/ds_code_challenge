@@ -162,13 +162,13 @@ def join_service_requests_to_hex(sr_df: pd.DataFrame, config: dict | None = None
     if outside_coverage_rows:
         logger.warning(f"retained {outside_coverage_rows} valid H3 indices outside City coverage")
 
-        report = JoinReport(
-            total_rows,
-            null_geolocation_rows,
-            joined_rows,
-            failed_rows
-        )
-        logger.info(report.summary().replace("\n", " | "))
+    report = JoinReport(
+        total_rows,
+        null_geolocation_rows,
+        joined_rows,
+        failed_rows
+    )
+    logger.info(report.summary().replace("\n", " | "))
     
     threshold = config.get("join_error_threshold", 0.02)
     if report.failure_rate > threshold:

@@ -80,17 +80,17 @@ def load_valid_hex_set(bucket: str = Settings.S3_BUCKET, key: str = Settings.HEX
             valid.add(str(idx))
     return valid
 
-def join_service_requests_to_hex(sr_df: pd.DataFrame, config: dict, valid_hex_set: set[str]):
+def join_service_requests_to_hex(sr_df: pd.DataFrame, config: dict | None = None, valid_hex_set: set[str] | None = None):
 
     '''
         main join logic
     '''
 
-    config = config or load_join_config
+    config = config or load_join_config()
     cols = config["columns"]
 
     lat_col, lon_col, out_col = cols['latitude'], cols['longitude'], cols['output_index']
-    null_sentinel = config["h3"]["null_geolocations_index"]
+    null_sentinel = config["h3"]["null_geolocation_index"]
     resolution = config["h3"]["resolution"]
 
     missing = {lat_col, lon_col} - set(sr_df.columns)

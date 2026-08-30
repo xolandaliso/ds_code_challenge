@@ -9,3 +9,4 @@ requests>=2.31
 tenacity>=8.2
 pytest>=8.0
 pretty-loguru>=1.2.0
+openpyxl>=3.1

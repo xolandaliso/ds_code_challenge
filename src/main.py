@@ -2,10 +2,11 @@
     - pipeline entrypoint for the DE challenge tasks
 
 '''
-import io
-import pandas as pd
-import json, gzip, yaml
+import json
 from pathlib import Path
+
+import pandas as pd
+
 from src.utils import load_yaml, timed, read_gzip_csv_from_s3
 
 # task 1
@@ -26,7 +27,7 @@ from src.subsample_atlantis import (
 from src.augment_wind import fetch_wind_workbook, read_atlantis_wind, join_wind_to_subsample
 from src.anonymize import anonymise_subsample
 
-from src.settings import Settings, get_s3_client, logger
+from src.settings import Settings, logger
 
 
 def run_task_extraction() -> list[dict]:
@@ -34,13 +35,21 @@ def run_task_extraction() -> list[dict]:
     with timed("Task 1"):
         features = extract_hex_resolution8()
         schema = load_yaml("config/hex_schema.yml")
-        conformance = score_features(features, schema)
+        with timed("Schema conformance validation"):
+            conformance = score_features(features, schema)
 
-        logger.info(conformance.summary(schema.get("score_bands")))
+        score_bands = schema.get("score_bands")
+        logger.info(conformance.summary(score_bands))
+        if conformance.band(score_bands) == "fail":
+            raise RuntimeError("Task 1 schema conformance score is below threshold")
+
         reference_index_set = load_reference_index_set()
 
-        validation = validate_extraction(features, reference_index_set)
-        logger.info(validation.summary())
+        with timed("Task 1 reference validation"):
+            validation = validate_extraction(features, reference_index_set)
+
+        if not validation.is_exact_match:
+            raise RuntimeError("Task 1 extraction does not match the reference data")
 
         out_dir = Path(Settings.OUTPUT_DIR)
         out_dir.mkdir(parents = True, exist_ok = True)
@@ -61,12 +70,13 @@ def run_task_srequests(reference_df: pd.DataFrame | None = None) -> tuple[pd.Dat
         if reference_df is None:
             reference_df = read_gzip_csv_from_s3(Settings.SR_HEX_KEY)
         
-        validation = validate_join_against_reference(
-            joined_df,
-            reference_df,
-            config["columns"]["output_index"],
-            config["columns"].get("validation_key_columns")
-        )
+        with timed("Task 2 reference validation"):
+            validation = validate_join_against_reference(
+                joined_df,
+                reference_df,
+                config["columns"]["output_index"],
+                config["columns"].get("validation_key_columns")
+            )
         logger.info(validation.summary())
 
         if not validation.is_exact_match:
@@ -111,6 +121,9 @@ def run_task_subsample_and_anonymise(sr_hex_df: pd.DataFrame | None = None) -> t
             lon_col = config["columns"]["longitude"],
             radius_metres = suburb_cfg["radius_metres"],
         )
+        if subsample_df.empty:
+            raise RuntimeError("Task 5 produced an empty suburb subsample")
+
         subsample_df.to_csv(out_dir / "task5_1_subsample.csv", index = False)
 
         # --- 5.2: augment with Atlantis wind data ---
@@ -120,12 +133,11 @@ def run_task_subsample_and_anonymise(sr_hex_df: pd.DataFrame | None = None) -> t
             cache_path = wind_cfg["cache_path"],
         )
         wind_df = read_atlantis_wind(workbook_path, station_name = wind_cfg.get("station_name", "Atlantis"))
-        logger.warning("***----added this for diagnostic---***")
-        request_timestamps = pd.to_datetime(subsample_df["creation_timestamp"], errors="coerce")
-        print(request_timestamps.dt.year.value_counts().sort_index())
-        print(wind_df["wind_timestamp"].min(), wind_df["wind_timestamp"].max())
-        print(wind_df["wind_timestamp"].dt.date.nunique(), "distinct days covered")
-        logger.warning("***---- diagnostic ends here---***")
+        logger.info(
+            f"Atlantis wind observations cover "
+            f"{wind_df['wind_timestamp'].dt.date.nunique()} distinct days from "
+            f"{wind_df['wind_timestamp'].min()} to {wind_df['wind_timestamp'].max()}"
+        )
         augmented_df = join_wind_to_subsample(
             subsample_df,
             wind_df,

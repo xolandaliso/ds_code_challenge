@@ -45,17 +45,21 @@ def validate_join_against_reference(
             raise KeyError(f"{label} data has no '{index_col}' column")
 
     key_columns = key_columns or []
-    common_keys = [
-        column for column in key_columns
-        if column in joined_df.columns and column in reference_df.columns
-    ]
-    if common_keys:
-        left_keys = joined_df[common_keys].fillna("<NULL>").astype(str).reset_index(drop=True)
-        right_keys = reference_df[common_keys].fillna("<NULL>").astype(str).reset_index(drop=True)
+    for label, frame in (("generated", joined_df), ("reference", reference_df)):
+        missing_keys = set(key_columns) - set(frame.columns)
+        if missing_keys:
+            raise KeyError(
+                f"{label} data is missing configured validation keys: "
+                f"{sorted(missing_keys)}"
+            )
+
+    if key_columns:
+        left_keys = joined_df[key_columns].fillna("<NULL>").astype(str).reset_index(drop=True)
+        right_keys = reference_df[key_columns].fillna("<NULL>").astype(str).reset_index(drop=True)
         if not left_keys.equals(right_keys):
             raise ValueError(
                 "Reference rows are not in the same order as generated rows; "
-                f"key check failed for {common_keys}"
+                f"key check failed for {key_columns}"
             )
 
     generated = joined_df[index_col].fillna("<NULL>").astype(str).reset_index(drop=True)

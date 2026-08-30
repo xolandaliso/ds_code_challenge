@@ -56,17 +56,16 @@ def extract_hex_resolution8(
     key: str = Settings.HEX_RES8_10_KEY,
     resolution: int = 8,
 ) -> list[dict[str, Any]]:
-  
     try:
         features = extract_resolution8_via_s3_select(bucket, key, resolution)
-        if features:
-            return features
-        logger.warning("s3 select returned no records....")
+    except Exception as exc:
+        raise RuntimeError(f"S3 Select extraction failed: {exc}") from exc
 
-    except Exception as exc:  
-        logger.warning(f"there was an error using s3 select - check your connection and debug : {exc}")
+    if not features:
+        raise RuntimeError("S3 Select returned no records")
+
+    return features
 
 if __name__ == "__main__":
     features = extract_hex_resolution8()
     logger.info(f"extracted {len(features)} res-8 features.")
-

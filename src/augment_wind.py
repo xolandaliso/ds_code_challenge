@@ -340,12 +340,9 @@ def join_wind_to_subsample(
     unmatched_rate = float(merged["wind_timestamp"].isna().mean()) if len(merged) else 0.0
     logger.info(f"Wind enrichment unmatched rate: {unmatched_rate:.2%}")
     if unmatched_rate > max_unmatched_rate:
-
-        logger.warning(
-            f"Wind unmatched rate {unmatched_rate:.2%} exceeds the configured "
-            f"{max_unmatched_rate:.2%} threshold. The Atlantis AQM station's 2020 "
-            f"export only covers ~101 of 366 days; unmatched rows are enriched "
-            f"with null wind_speed/wind_direction rather than the pipeline failing."
+        raise WindDataError(
+            f"Wind unmatched rate {unmatched_rate:.2%} exceeds configured maximum "
+            f"{max_unmatched_rate:.2%}"
         )
 
     return merged.sort_values("row_order").drop(columns="row_order").reset_index(drop=True)

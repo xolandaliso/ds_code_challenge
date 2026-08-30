@@ -9,6 +9,7 @@ import re
 import yaml
 from typing import Any
 from pathlib import Path
+from src.utils import load_yaml
 from dataclasses import dataclass, field
 from src.settings import Settings, logger
 from src.extract import extract_hex_resolution8
@@ -59,15 +60,6 @@ class ConformanceResult:
                 lines.append(f"  {reason}: {count}")
         
         return "\n".join(lines)
-    
-def load_schema(path: str) -> dict[str, Any]:
-    '''
-        load the expected schema from a yaml file.
-    '''
-    with open(path, 'r') as f:
-        schema = yaml.safe_load(f)
-    return schema
-
 
 def check_property_rules(props: dict[str, Any], rules: dict[str, Any], violations: dict[str, int]) -> tuple[int, int]:
     '''
@@ -185,9 +177,9 @@ def score_features(features: list[dict[str, Any]], schema: dict[str, Any]) -> Co
 
 if __name__ == "__main__":
 
-    schema = load_schema("config/hex_schema.yml")
+    schema = load_yaml("config/hex_schema.yml")
     feats = extract_hex_resolution8()
     result = score_features(feats, schema)
     logger.info(f"Conformance summary:\n {result.summary(schema.get("score_bands"))}")
 
-    
+
